@@ -1,0 +1,232 @@
+import React, { useState } from 'react';
+import { TrainTimeline } from './components/TrainTimeline';
+import { ConflictHeatmap } from './components/ConflictHeatmap';
+import { RecommendationCard } from './components/RecommendationCard';
+import { CounterfactualSlider } from './components/CounterfactualSlider';
+import { OverrideModal } from './components/OverrideModal';
+import { WhatIfToolbar } from './components/WhatIfToolbar';
+import { KPIPanel } from './components/KPIPanel';
+import { Button } from './components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Train, Conflict, Recommendation } from './types/dashboard';
+import { Home, Clock, AlertTriangle, Lightbulb } from 'lucide-react';
+
+type ViewType = 'home' | 'timeline' | 'conflicts' | 'recommendations';
+
+// Mock data
+const mockTrains: Train[] = [
+  { id: 'T123', priority: 'high', status: 'delayed', currentTime: '14:15', predictedDelay: 4, route: 'A-B-C' },
+  { id: 'T456', priority: 'medium', status: 'on-time', currentTime: '14:20', predictedDelay: 0, route: 'B-C-D' },
+  { id: 'T789', priority: 'low', status: 'moderate-risk', currentTime: '14:25', predictedDelay: 2, route: 'C-D-E' },
+  { id: 'T101', priority: 'high', status: 'on-time', currentTime: '14:30', predictedDelay: 0, route: 'A-C-E' },
+  { id: 'T112', priority: 'medium', status: 'delayed', currentTime: '14:35', predictedDelay: 6, route: 'B-D-F' },
+];
+
+const mockConflicts: Conflict[] = [
+  { section: 'A-B', timeWindow: '14:20-14:35', trains: ['T123', 'T456'], likelihood: 0.8 },
+  { section: 'B-C', timeWindow: '14:25-14:40', trains: ['T456', 'T789'], likelihood: 0.6 },
+  { section: 'C-D', timeWindow: '14:30-14:45', trains: ['T789', 'T101'], likelihood: 0.4 },
+];
+
+const mockRecommendation: Recommendation = {
+  action: 'Hold Train T123 for 2 min',
+  confidence: 82,
+  impact: 'Reduce weighted delay by 3.2 min',
+  trainId: 'T123',
+};
+
+export default function App() {
+  const [currentView, setCurrentView] = useState<ViewType>('home');
+  const [whatIfMode, setWhatIfMode] = useState(false);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState('baseline');
+  const [counterfactualValue, setCounterfactualValue] = useState(0);
+
+  const handleAcceptRecommendation = () => {
+    console.log('Recommendation accepted');
+  };
+
+  const handleRejectRecommendation = () => {
+    console.log('Recommendation rejected');
+  };
+
+  const handleModifyRecommendation = () => {
+    setShowOverrideModal(true);
+  };
+
+  const handleSubmitOverride = (reason: string) => {
+    console.log('Override submitted:', reason);
+    setShowOverrideModal(false);
+  };
+
+  const handleResetScenario = () => {
+    setSelectedScenario('baseline');
+    setCounterfactualValue(0);
+    console.log('Scenario reset to baseline');
+  };
+
+  const handleNavigateToDashboard = () => {
+    // Reset all states to default dashboard view
+    setCurrentView('home');
+    setWhatIfMode(false);
+    setSelectedScenario('baseline');
+    setCounterfactualValue(0);
+    setShowOverrideModal(false);
+    console.log('Navigated to dashboard');
+  };
+
+  const renderHomeView = () => (
+    <div className="container mx-auto px-6 py-12">
+      <div className="text-center mb-12">
+        <h1 className="text-slate-900 mb-4">Railway Operations Control Center</h1>
+        <p className="text-slate-600 text-lg">Select a module to manage train operations</p>
+      </div>
+      
+      <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow duration-200 border-2 hover:border-blue-300"
+          onClick={() => setCurrentView('timeline')}
+        >
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-blue-600" />
+            </div>
+            <CardTitle>Timeline View</CardTitle>
+            <CardDescription>
+              Monitor train movements and schedules in real-time with Gantt-style visualization
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow duration-200 border-2 hover:border-orange-300"
+          onClick={() => setCurrentView('conflicts')}
+        >
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-orange-600" />
+            </div>
+            <CardTitle>Conflict Analysis</CardTitle>
+            <CardDescription>
+              Identify and analyze potential track conflicts and scheduling issues
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow duration-200 border-2 hover:border-green-300"
+          onClick={() => setCurrentView('recommendations')}
+        >
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lightbulb className="w-8 h-8 text-green-600" />
+            </div>
+            <CardTitle>AI Recommendations</CardTitle>
+            <CardDescription>
+              Review AI-powered optimization suggestions and operational guidance
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    </div>
+  );
+
+  const renderTimelineView = () => (
+    <div className="p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 h-[calc(100vh-160px)]">
+        <div className="p-4 border-b border-slate-200">
+          <h2 className="text-slate-900">Train Movement Timeline</h2>
+          <p className="text-slate-600">Gantt view of scheduled and predicted movements</p>
+        </div>
+        <div className="p-4 h-[calc(100%-80px)]">
+          <TrainTimeline trains={mockTrains} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderConflictsView = () => (
+    <div className="p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+        <div className="p-4 border-b border-slate-200">
+          <h2 className="text-slate-900">Conflict Analysis</h2>
+          <p className="text-slate-600">Track segment conflicts by time window</p>
+        </div>
+        <div className="p-6">
+          <ConflictHeatmap conflicts={mockConflicts} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderRecommendationsView = () => (
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-slate-900 mb-2">AI Recommendations</h2>
+        <p className="text-slate-600">Current optimization suggestions</p>
+      </div>
+      
+      <RecommendationCard
+        recommendation={mockRecommendation}
+        onAccept={handleAcceptRecommendation}
+        onReject={handleRejectRecommendation}
+        onModify={handleModifyRecommendation}
+      />
+      
+      <CounterfactualSlider
+        trainId="T123"
+        onValueChange={setCounterfactualValue}
+        value={counterfactualValue}
+      />
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={handleNavigateToDashboard}
+              className="flex items-center space-x-2"
+            >
+              <Home className="w-4 h-4" />
+              <span>Dashboard</span>
+            </Button>
+            <div>
+              <h1 className="text-slate-900">Railway Operations Control</h1>
+              <p className="text-slate-600">Real-time train movement coordination</p>
+            </div>
+          </div>
+          {currentView !== 'home' && (
+            <WhatIfToolbar 
+              whatIfMode={whatIfMode}
+              onToggleWhatIf={setWhatIfMode}
+              selectedScenario={selectedScenario}
+              onScenarioChange={setSelectedScenario}
+              onReset={handleResetScenario}
+            />
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="min-h-[calc(100vh-88px)]">
+        {currentView === 'home' && renderHomeView()}
+        {currentView === 'timeline' && renderTimelineView()}
+        {currentView === 'conflicts' && renderConflictsView()}
+        {currentView === 'recommendations' && renderRecommendationsView()}
+      </div>
+
+      {/* Override Modal */}
+      <OverrideModal
+        isOpen={showOverrideModal}
+        onClose={() => setShowOverrideModal(false)}
+        onSubmit={handleSubmitOverride}
+        recommendation={mockRecommendation}
+      />
+    </div>
+  );
+}
